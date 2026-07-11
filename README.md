@@ -1,73 +1,73 @@
-# React + TypeScript + Vite
+﻿# iMessing вЂ” Real-time Chat Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, feature-rich messaging app built with React, TypeScript, Hono, tRPC, and Drizzle ORM. Includes private/group chats, voice calls, file sharing, and Google Drive backup integration.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+вњЁ **Core:** рџ’¬ Private/group chats вЂў рџ“ћ Voice calls вЂў рџ“Ѓ File upload вЂў рџЋ¤ Voice messages вЂў рџ”” Read receipts вЂў рџ”ђ JWT auth
 
-## React Compiler
+рџ†• **Google Drive Backup:** рџ”— OAuth 2.0 вЂў рџ’ѕ Export history to Drive вЂў вљ™пёЏ Backup settings in preferences
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+**Frontend:** React 19, TypeScript, TailwindCSS, Vite, tRPC  
+**Backend:** Hono, tRPC, JWT, bcryptjs  
+**Database:** MySQL + Drizzle ORM  
+**Infrastructure:** Railway
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Quick Start
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git clone https://github.com/maaminjon-sketch/imessing.git
+cd imessing
+npm install
+cp .env.example .env
+npm run db:push
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Environment Setup
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```env
+# Required
+APP_ID=imessing
+APP_SECRET=your-secret-key
+DATABASE_URL=mysql://...
+KIMI_AUTH_URL=https://...
+KIMI_OPEN_URL=https://...
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Optional: Google Drive Backup
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_REDIRECT_URI=https://your-domain/api/google-drive/callback
 ```
+
+Setup: Google Cloud Console в†’ Enable Drive API в†’ OAuth 2.0 credentials в†’ Add redirect URI
+
+## Deployment (Railway)
+
+Connect GitHub repo в†’ Add MySQL в†’ Set env vars в†’ Deploy (reads `railway.json`)
+
+## Project Structure
+
+```
+api/               # tRPC + HTTP routes
+в”њв”Ђв”Ђ chat-router.ts # Chat + Google Drive
+db/                # Drizzle schema & migrations
+src/               # React frontend
+в”њв”Ђв”Ђ pages/Home.tsx # Main UI + Google Drive setup
+```
+
+## Scripts
+
+```bash
+npm run dev      # Dev server
+npm run build    # Production build
+npm start        # Run server
+npm run db:push  # Apply schema
+```
+
+## License
+
+MIT
+

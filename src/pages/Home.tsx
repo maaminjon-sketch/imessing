@@ -27,6 +27,7 @@ import {
   FileText,
   Download,
   Trash2,
+  CloudUpload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,6 +128,14 @@ export default function Home() {
     enabled: isAuthenticated,
   });
 
+  const { data: googleDriveStatus, refetch: refetchGoogleDriveStatus } = trpc.chat.googleDriveStatus.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+
+  const googleDriveAuthQuery = trpc.chat.getGoogleDriveAuthUrl.useQuery(undefined, {
+    enabled: false,
+  });
+
   const { data: searchResults } = trpc.contact.search.useQuery(
     { query: contactSearch },
     { enabled: contactSearch.length > 0 }
@@ -137,6 +146,13 @@ export default function Home() {
     onSuccess: () => {
       setMessageText("");
       refetchMessages();
+      refetchChats();
+    },
+  });
+
+  const backupChatToDrive = trpc.chat.backupChatToDrive.useMutation({
+    onSuccess: () => {
+      refetchGoogleDriveStatus();
       refetchChats();
     },
   });
@@ -226,6 +242,23 @@ export default function Home() {
     } catch (err) {
       console.error("Upload failed:", err);
     }
+  };
+
+  const handleConnectGoogleDrive = async () => {
+    try {
+      const result = await googleDriveAuthQuery.refetch();
+      const url = result.data?.url;
+      if (url) {
+        window.location.href = url;
+      }
+    } catch (err) {
+      console.error("Google Drive connect failed:", err);
+    }
+  };
+
+  const handleBackupChat = () => {
+    if (!selectedChat) return;
+    backupChatToDrive.mutate({ chatId: selectedChat.id });
   };
 
   const startRecording = async () => {
@@ -594,6 +627,43 @@ export default function Home() {
 
               <Separator />
 
+              <div className="rounded-xl border border-gray-200/70 dark:border-gray-700/70 bg-white dark:bg-gray-800 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold">Google Drive Backup</h4>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Connect your account and save chat history to Google Drive.
+                    </p>
+                  </div>
+                  <CloudUpload className="w-5 h-5 text-cyan-500" />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    {googleDriveStatus?.connected
+                      ? `Connected as ${googleDriveStatus.email}`
+                      : "Not connected"}
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      onClick={handleConnectGoogleDrive}
+                      className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600"
+                    >
+                      {googleDriveStatus?.connected ? "Reconnect Google Drive" : "Connect Google Drive"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleBackupChat}
+                      disabled={!googleDriveStatus?.connected || !selectedChat || backupChatToDrive.isLoading}
+                    >
+                      {backupChatToDrive.isLoading ? "Backing up..." : "Backup current chat"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
               <div className="bg-gradient-to-r from-cyan-500 via-blue-500 to-orange-400 rounded-xl p-4 text-white">
                 <h4 className="font-bold mb-1">iMessing Premium</h4>
                 <p className="text-sm text-white/80 mb-3">Unlock all features</p>
@@ -649,6 +719,15 @@ export default function Home() {
               }}
             >
               <Phone className="w-5 h-5 text-green-500" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!googleDriveStatus?.connected || backupChatToDrive.isLoading}
+              onClick={handleBackupChat}
+              className="text-cyan-500"
+            >
+              <CloudUpload className="w-5 h-5" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

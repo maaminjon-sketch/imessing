@@ -121,3 +121,20 @@ export const userSessions = mysqlTable("user_sessions", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export type UserSession = typeof userSessions.$inferSelect;
+
+export const googleDriveCredentials = mysqlTable("google_drive_credentials", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
+  googleUserId: varchar("google_user_id", { length: 100 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type GoogleDriveCredential = typeof googleDriveCredentials.$inferSelect;

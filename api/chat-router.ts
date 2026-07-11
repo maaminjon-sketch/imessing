@@ -3,7 +3,8 @@ import { eq, and, inArray, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { chats, chatMembers, messages, messageReads } from "../db/schema";
+import { chats, chatMembers, messages, messageReads, googleDriveCredentials } from "../db/schema";
+import { getGoogleDriveAuthUrl, uploadChatBackupToDrive } from "./lib/google-drive";
 
 export const chatRouter = createRouter({
   list: authedQuery.query(async ({ ctx }) => {
@@ -318,5 +319,98 @@ export const chatRouter = createRouter({
         .where(eq(messages.id, input.messageId));
 
       return { success: true };
+    }),
+
+  getGoogleDriveAuthUrl: authedQuery.query(async ({ ctx }) => {
+    return { url: getGoogleDriveAuthUrl(ctx.token || "") };
+  }),
+
+  googleDriveStatus: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const credential = await db.query.googleDriveCredentials.findFirst({
+      where: eq(googleDriveCredentials.userId, ctx.user.id),
+    });
+    return {
+      connected: Boolean(credential),
+      email: credential?.email || null,
+      googleUserId: credential?.googleUserId || null,
+    };
+  }),
+
+  backupChatToDrive: authedQuery
+    .input(z.object({ chatId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+
+      const membership = await db.query.chatMembers.findFirst({
+        where: and(
+          eq(chatMembers.chatId, input.chatId),
+          eq(chatMembers.userId, ctx.user.id)
+        ),
+      });
+
+      if (!membership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You are not a member of this chat",
+        });
+      }
+
+      const credential = await db.query.googleDriveCredentials.findFirst({
+        where: eq(googleDriveCredentials.userId, ctx.user.id),
+      });
+
+      if (!credential) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Google Drive is not connected",
+        });
+      }
+
+      const chat = await db.query.chats.findFirst({
+        where: eq(chats.id, input.chatId),
+      });
+
+      const chatMessages = await db.query.messages.findMany({
+        where: and(eq(messages.chatId, input.chatId), eq(messages.isDeleted, false)),
+        orderBy: [desc(messages.createdAt)],
+      });
+
+      const exportPayload = {
+        chatId: input.chatId,
+        chatName: chat?.name || "Private Chat",
+        exportedAt: new Date().toISOString(),
+        messages: chatMessages
+          .map((message) => ({
+            id: message.id,
+            senderId: message.senderId,
+            type: message.type,
+            content: message.content,
+            fileUrl: message.fileUrl,
+            fileName: message.fileName,
+            fileSize: message.fileSize,
+            duration: message.duration,
+            replyTo: message.replyTo,
+            createdAt: message.createdAt,
+          }))
+          .reverse(),
+      };
+
+      const buffer = Buffer.from(JSON.stringify(exportPayload, null, 2), "utf-8");
+      const fileName = `imessing-chat-${input.chatId}-${Date.now()}.json`;
+      const uploaded = await uploadChatBackupToDrive(
+        {
+          refresh_token: credential.refreshToken,
+        },
+        fileName,
+        buffer
+      );
+
+      return {
+        success: true,
+        fileId: uploaded.id,
+        fileName: uploaded.name,
+        webViewLink: uploaded.webViewLink || null,
+      };
     }),
 });

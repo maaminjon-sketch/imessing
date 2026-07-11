@@ -1,10 +1,13 @@
-import { Hono } from "hono";
+﻿import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
+import { getDb } from "./queries/connection";\nimport { eq } from "drizzle-orm";\nimport { getUserFromToken } from "./lib/auth";
+import { googleDriveCredentials } from "../db/schema";
+import { exchangeCodeForGoogleTokens, getGoogleDriveUserInfo } from "./lib/google-drive";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -101,6 +104,59 @@ app.use("/uploads/*", async (c) => {
   }
 });
 
+app.get("/api/google-drive/callback", async (c) => {
+  const code = c.req.query("code") as string | null;
+  const state = c.req.query("state") as string | null;
+
+  if (!code || !state) {
+    return c.text("Google Drive authorization failed. Missing code or state.", 400);
+  }
+
+  const user = await getUserFromToken(state);
+  if (!user) {
+    return c.text("Invalid or expired session state.", 401);
+  }
+
+  try {
+    const tokens = await exchangeCodeForGoogleTokens(code);
+    const userInfo = await getGoogleDriveUserInfo(tokens);
+    const refreshToken = tokens.refresh_token;
+
+    if (!refreshToken) {
+      return c.text(
+        "No refresh token returned by Google. Try reconnecting with a fresh consent prompt.",
+        400,
+      );
+    }
+
+    const db = getDb();
+    const existing = await db.query.googleDriveCredentials.findFirst({
+      where: eq(googleDriveCredentials.userId, user.id),
+    });
+
+    if (existing) {
+      await db.update(googleDriveCredentials).set({
+        googleUserId: userInfo.id || existing.googleUserId,
+        email: userInfo.email || existing.email,
+        refreshToken,
+        updatedAt: new Date(),
+      }).where(eq(googleDriveCredentials.userId, user.id));
+    } else {
+      await db.insert(googleDriveCredentials).values({
+        userId: user.id,
+        googleUserId: userInfo.id || "",
+        email: userInfo.email || "",
+        refreshToken,
+      });
+    }
+
+    return c.redirect("/");
+  } catch (error) {
+    console.error("Google Drive callback error:", error);
+    return c.text("Google Drive connection failed.", 500);
+  }
+});
+
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;
@@ -115,3 +171,4 @@ if (env.isProduction) {
     console.log(`Server running on http://localhost:${port}/`);
   });
 }
+
